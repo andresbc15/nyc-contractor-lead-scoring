@@ -1,0 +1,5 @@
+fastapi
+requests
+python-dotenv
+google-auth
+google-cloud-storage
