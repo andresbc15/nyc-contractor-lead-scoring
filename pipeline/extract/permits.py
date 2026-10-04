@@ -11,3 +11,9 @@ print("Status:", response.status_code)
 rows = response.json()
 print("Rows received:", len(rows))
 print("First row keys:", list(rows[0].keys()))
+
+from pipeline.contracts.permits import PermitRecord
+
+for row in rows:
+    PermitRecord(**row)
+print("All rows match the contract")
