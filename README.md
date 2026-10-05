@@ -1,4 +1,4 @@
-# scoring-contractors-b2b-payments
+# nyc-contractor-lead-scoring
 Which New York City trade contractors look like high-value leads for a B2B payments platform, and how do their job frequency and cost vary by trade and company size?
 
 ## Team Members
@@ -59,7 +59,7 @@ cp .env_template .env
 | `GCP_PROJECT_ID` | ID of the prerequisite GCP project | `nyc-contractor-lead-scoring` |
 | `GCP_BUCKET_NAME` | Name of the required bucket inside the GCP project | `nyc-contractor-leads-table-data` |
 | `GCP_SERVICE_ACCOUNT_KEY` | Absolute path to your service account JSON | `/Users/you/.ssh/key.json` |
-| `DOB_APP_TOKEN` | Free App Token for the NYC Open Data website | `Tl2qvgkiP1w7g9yaBCvtz2KPd` |
+| `DOB_APP_TOKEN` | Free App Token for the NYC Open Data website | `Tl2qxxxxxxxxxxKPd` |
 
 ### 3. How to call your endpoint
 To start the API server,
@@ -75,7 +75,7 @@ Writes to a new .json in raw/permits/
 ---
 ## Repository Structure
 ```
-.
+nyc_contractors/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
@@ -83,7 +83,7 @@ Writes to a new .json in raw/permits/
 │       ├── __init__.py
 │       ├── permits.py
 │       ├── licenses.py
-│       └── enrich.py
+│       └── websites.py
 ├── pipeline/
 │   ├── __init__.py
 │   ├── config.py
@@ -93,12 +93,17 @@ Writes to a new .json in raw/permits/
 │   │   ├── __init__.py
 │   │   ├── permits.py
 │   │   ├── licenses.py
-│   │   └── websites.py
+│   │   └── website_signals.py
 │   ├── extract/
 │   │   ├── __init__.py
 │   │   ├── permits.py
-│   │   ├── licenses.py
-│   │   └── websites.py
+│   │   └── licenses.py
+│   ├── websites/
+│   │   ├── __init__.py
+│   │   ├── domains.py
+│   │   ├── scrape.py
+│   │   ├── signals.py
+│   │   └── llm.py
 │   └── transform/
 │       ├── __init__.py
 │       └── build.py
