@@ -18,10 +18,10 @@ def extract(max_rows):
         try:
             valid_rows.append(DobLicenseRow.model_validate(row))
         except ValidationError as e:
+            errors += 1
             print(f"Row {row.get('id')} failed the pydantic test: {e}")
 
     if not valid_rows:
-        raise ValueError(f"All {len(rows)} rows failed validation for {DATASET_ID}")
-
-    print(f"Extracted {len(valid_rows)} rows with {errors} errors ({round(errors/len(valid_rows)*100, 2)}%)")
+        raise ValueError(f"All {len(valid_rows)} rows failed validation for {DATASET_ID}")
+    print(f"Extracted {len(valid_rows)} rows with {errors} errors ({errors / len(rows):.2%})")
     return valid_rows
