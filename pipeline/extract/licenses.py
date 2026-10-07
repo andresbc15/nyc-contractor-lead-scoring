@@ -22,6 +22,6 @@ def extract(max_rows):
             print(f"Row {row.get('id')} failed the pydantic test: {e}")
 
     if not valid_rows:
-        raise ValueError(f"All {len(valid_rows)} rows failed validation for {DATASET_ID}")
+        raise ValueError(f"All {len(rows)} rows failed validation for {DATASET_ID}")
     print(f"Extracted {len(valid_rows)} rows with {errors} errors ({errors / len(rows):.2%})")
     return valid_rows

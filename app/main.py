@@ -7,7 +7,12 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 from google.cloud import storage
 
+from app.routers import licenses
+
 app = FastAPI()
+app.include_router(licenses.router)
+
+# TO DO: Migrate to extract/licenses and storage.py
 load_dotenv()
 
 dob_app_token = os.getenv("DOB_APP_TOKEN")
