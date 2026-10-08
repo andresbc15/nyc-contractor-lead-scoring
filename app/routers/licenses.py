@@ -4,9 +4,8 @@ from datetime import date
 import requests
 from fastapi import APIRouter, HTTPException
 from google.cloud import storage
-from google.oauth2 import service_account
 
-from pipeline.config import GCP_BUCKET_NAME, GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_KEY
+from pipeline.config import GCP_BUCKET_NAME, GCP_PROJECT_ID
 from pipeline.extract import licenses
 
 router = APIRouter(prefix="/extract")
@@ -14,8 +13,7 @@ router = APIRouter(prefix="/extract")
 
 # TEMPORARY: move to pipeline/storage.py once it exists
 def get_bucket():
-    credentials = service_account.Credentials.from_service_account_file(GCP_SERVICE_ACCOUNT_KEY)
-    client = storage.Client(project=GCP_PROJECT_ID, credentials=credentials)
+    client = storage.Client(project=GCP_PROJECT_ID)
     return client.bucket(GCP_BUCKET_NAME)
 
 
@@ -27,11 +25,11 @@ def upload_json_to_gcp(bucket, data, blob_name):
 
 @router.post("/licenses")
 def extract_licenses(max_rows: int = 1000):
-    # Check bucket access before the ~90s extract, so a bad key fails immediately.
-    # Loading the key file alone doesn't check permissions, so ask GCS directly.
+    # Check bucket access before the ~90s extract, so missing access fails immediately.
+    # Creating the client alone doesn't check permissions, so ask GCS directly.
     bucket = get_bucket()
     if "storage.objects.create" not in bucket.test_iam_permissions(["storage.objects.create"]):
-        raise HTTPException(status_code=500, detail=f"Service account cannot upload to bucket '{GCP_BUCKET_NAME}'")
+        raise HTTPException(status_code=500, detail=f"Current credentials cannot upload to bucket '{GCP_BUCKET_NAME}'")
 
     try:
         records = licenses.extract(max_rows)
