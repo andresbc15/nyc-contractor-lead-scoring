@@ -40,7 +40,7 @@ def extract_licenses(max_rows: int = 1000):
 
     # TEMPORARY: serializing to JSON belongs in pipeline/storage.py's write function, not the router
     rows = [record.model_dump(mode="json") for record in records]
-    blob_name = f"raw/dob_licenses/dt={date.today().isoformat()}/dob_licenses.json"
+    blob_name = f"raw/dob_licenses/{date.today().isoformat()}/dob_licenses.json"
     upload_json_to_gcp(bucket, rows, blob_name)
 
     return {"dataset": licenses.DATASET_ID, "rows": len(rows), "uploaded": blob_name}
