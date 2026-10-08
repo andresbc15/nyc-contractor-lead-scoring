@@ -1,5 +1,6 @@
-fastapi
+fastapi[standard]
 requests
 python-dotenv
 google-auth
 google-cloud-storage
+pydantic
