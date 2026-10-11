@@ -36,7 +36,7 @@ def get_bucket():
     return client.bucket(GCP_BUCKET_NAME)
 
 
-# TEMPORARY: move to pipeline/storage.py once it exists
+# TO DO: move to pipeline/storage.py once it exists
 def upload_json_to_gcp(bucket, data, blob_name):
     bucket.blob(blob_name).upload_from_string(
         json.dumps(data), content_type="application/json"
@@ -44,6 +44,9 @@ def upload_json_to_gcp(bucket, data, blob_name):
     return blob_name
 
 
+# TO DO: after PR#12, licenses land in raw/licenses/<timestamp>.json, so this prefix stops matching.
+# Move logic to storage.py
+# Generalize to latest_file_name(bucket, prefix) and skip names that don't match the timestamp pattern.
 def latest_licenses_file_name(bucket):
     file_names = [
         blob.name
@@ -57,6 +60,7 @@ def latest_licenses_file_name(bucket):
     return max(file_names)
 
 
+# TO DO: move to storage but file_name output is important to run() because it is used to name output files
 def load_licenses():
     bucket = get_bucket()
     file_name = latest_licenses_file_name(bucket)
@@ -87,6 +91,7 @@ def deduplicated_licences(data):
     licenses = set()
     deduped_data = []
     for row in data:
+        # License numbers are reused across license types
         key = (row["license_type"], row["license_number"])
         if key in licenses:
             continue
@@ -101,6 +106,7 @@ def is_valid_email(email):
 
 def is_business_domain(email):
     domain = email.split("@")[1]
+    # whitelist is the package's list of free email providers (personal)
     return domain not in whitelist
 
 
@@ -162,7 +168,7 @@ def run():
 
     scrape_targets = select_scrape_targets(data_with_domains)
 
-    # Make blob names
+    # TO DO: This filename logic breaks after PR#12 since the logic in this file gets the date from the filename
     source_date = file_name.split("/")[2]
     data_with_domains_blob_name = (
         f"intermediate/licenses_to_domains/{source_date}/licenses_to_domains.json"
@@ -171,7 +177,7 @@ def run():
         f"intermediate/website_domains/{source_date}/website_domains.json"
     )
 
-    # TEMPORARY: should busing functions from storage.py
+    # TO DO: remove the follwing since this should busing functions from storage.py
     bucket = get_bucket()
 
     # Upload licenses with domains
