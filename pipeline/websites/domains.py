@@ -36,6 +36,14 @@ def get_bucket():
     return client.bucket(GCP_BUCKET_NAME)
 
 
+# TEMPORARY: move to pipeline/storage.py once it exists
+def upload_json_to_gcp(bucket, data, blob_name):
+    bucket.blob(blob_name).upload_from_string(
+        json.dumps(data), content_type="application/json"
+    )
+    return blob_name
+
+
 def latest_licenses_file_name(bucket):
     file_names = [
         blob.name
@@ -136,3 +144,49 @@ def select_scrape_targets(license_domains):
         {"domain": domain, "n_licenses": n_licenses}
         for domain, n_licenses in domain_counts.items()
     ]
+
+
+def run():
+
+    file_name, data = load_licenses()
+
+    print(f"Loaded licenses from {file_name}")
+
+    reduced_data = extract_licenses(data)
+
+    filtered_data = filter_license_types(reduced_data)
+
+    deduped_data = deduplicated_licences(filtered_data)
+
+    data_with_domains = map_licenses_to_domains(deduped_data)
+
+    scrape_targets = select_scrape_targets(data_with_domains)
+
+    # Make blob names
+    source_date = file_name.split("/")[2]
+    data_with_domains_blob_name = (
+        f"intermediate/licenses_to_domains/{source_date}/licenses_to_domains.json"
+    )
+    scrape_targets_blob_name = (
+        f"intermediate/website_domains/{source_date}/website_domains.json"
+    )
+
+    # TEMPORARY: should busing functions from storage.py
+    bucket = get_bucket()
+
+    # Upload licenses with domains
+    upload_json_to_gcp(bucket, data_with_domains, data_with_domains_blob_name)
+
+    # Upload scraping targets
+    upload_json_to_gcp(bucket, scrape_targets, scrape_targets_blob_name)
+
+    return {
+        "source": file_name,
+        "licenses": len(data_with_domains),
+        "scrape_targets": len(scrape_targets),
+        "uploaded": [data_with_domains_blob_name, scrape_targets_blob_name],
+    }
+
+
+if __name__ == "__main__":
+    print(run())
