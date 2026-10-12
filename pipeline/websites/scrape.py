@@ -1,4 +1,5 @@
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 import requests
@@ -107,16 +108,15 @@ def run(limit=100):
     if not targets:
         return {"source": file_name, "domains": 0, "errors": {}, "uploaded": None}
 
-    results = []
-    scraped_website_status = []
+    # Fetch 10 websites at a time
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_html, [t["domain"] for t in targets]))
 
-    for target in targets:
-        result = fetch_html(target["domain"])
-        results.append(result)
-        # Make a list of websites that were scraped so we can reference later
-        scraped_website_status.append(
-            {key: result[key] for key in ("domain", "status", "error", "fetched_at")}
-        )
+    # Make a list of websites that were scraped so we can reference later
+    scraped_website_status = [
+        {key: result[key] for key in ("domain", "status", "error", "fetched_at")}
+        for result in results
+    ]
 
     # Upload html and status for every domain to raw/websites
     blob_name = storage.write_data("websites", results)
