@@ -8,7 +8,7 @@ from pipeline.extract import licenses
 router = APIRouter(prefix="/extract")
 
 @router.post("/licenses")
-def extract_licenses(max_rows: int = 1000):
+def extract_licenses(max_rows: int | None = None):
     # Check bucket access before the ~90s extract, so missing access fails immediately.
     # Creating the client alone doesn't check permissions, so ask GCS directly.
     if not storage.can_write():
