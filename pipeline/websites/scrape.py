@@ -1,9 +1,12 @@
+from collections import Counter
 from datetime import UTC, datetime
 
 import requests
 
+from pipeline import storage
+
 # Some sites block the default python-requests user agent
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; nyc-contractor-research)"}
+HEADERS = {"User-Agent": "nyc-contractor-scraper/1.0"}
 
 
 def fetch_html(domain):
@@ -75,3 +78,62 @@ def fetch_html(domain):
         "error": None,
         "fetched_at": datetime.now(UTC).isoformat(),
     }
+
+
+def run(limit=100):
+
+    # Check if there are any websites to scrape
+    try:
+        file_name, targets = storage.read_latest_file(
+            "website_domains", stage="intermediate"
+        )
+    except FileNotFoundError:
+        raise FileNotFoundError("No scrape targets found")
+
+    # Check for websites that were scraped in the past
+    try:
+        _, scraped = storage.read_latest_file("website_status", stage="intermediate")
+    except FileNotFoundError:
+        scraped = []
+
+    # Make set for those domains
+    prev_scraped = {row["domain"] for row in scraped}
+
+    # Go for domains with the most licenses first
+    targets = sorted(targets, key=lambda row: row["n_licenses"], reverse=True)
+    targets = [t for t in targets if t["domain"] not in prev_scraped][:limit]
+
+    # No target or every domain already scraped
+    if not targets:
+        return {"source": file_name, "domains": 0, "errors": {}, "uploaded": None}
+
+    results = []
+    scraped_website_status = []
+
+    for target in targets:
+        result = fetch_html(target["domain"])
+        results.append(result)
+        # Make a list of websites that were scraped so we can reference later
+        scraped_website_status.append(
+            {key: result[key] for key in ("domain", "status", "error", "fetched_at")}
+        )
+
+    # Upload html and status for every domain to raw/websites
+    blob_name = storage.write_data("websites", results)
+
+    # Extend the list of websites that were scraped
+    status_blob_name = storage.write_data(
+        "website_status", scraped + scraped_website_status, stage="intermediate"
+    )
+
+    # Return a summary
+    return {
+        "source": file_name,
+        "domains": len(results),
+        "errors": dict(Counter(row["error"] for row in results)),
+        "uploaded": [blob_name, status_blob_name],
+    }
+
+
+if __name__ == "__main__":
+    print(run())
