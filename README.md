@@ -6,7 +6,7 @@ Which New York City trade contractors look like high-value leads for a B2B payme
 | Name | GitHubID | Role / Focus |
 | --- | --- | --- |
 | Nathan Gong | nathan-gong9 | Fastapi implementation, .env, contract review, GCS folder structure |
-| Yash Tiwari | yshtiwa | NYC API permits extractor, historical backfill |
+| Yash Tiwari | yshtiwa | Permits extractor + contract, backfill, /extract/permits endpoint |
 | Andres Javier Miguel Cojuangco | andresbc15 | License, email, and contract extraction + HTML storage |
 | Joseph Lacap | Joseph5105 | GCP project, bucket and service accounts + scheduled collection of all sources|
 | Disha Khati | dkhati2 | Python transformation + streamlit dashboard, team contract|
@@ -56,10 +56,12 @@ cp .env_template .env
 
 | Variable | Description | Example |
 | --- | --- | --- |
-| `GCP_PROJECT_ID` | ID of the prerequisite GCP project | `nyc-contractor-lead-scoring` |
+| `GCP_PROJECT_ID` | ID of the prerequisite GCP project | `nyc-contractor-leads` |
 | `GCP_BUCKET_NAME` | Name of the required bucket inside the GCP project | `nyc-contractor-leads-table-data` |
 | `GCP_SERVICE_ACCOUNT_KEY` | Absolute path to your service account JSON | `/Users/you/.ssh/key.json` |
 | `DOB_APP_TOKEN` | Free App Token for the NYC Open Data website | `Tl2qxxxxxxxxxxKPd` |
+
+**How to get the DOB app token:** sign up or sign in at [data.cityofnewyork.us](https://data.cityofnewyork.us), go to your profile, open Developer Settings and click Create New App Token. Copy the App Token (not the Secret Token) into `.env` as `DOB_APP_TOKEN`.
 
 ### 3. How to call your endpoint
 To start the API server,
