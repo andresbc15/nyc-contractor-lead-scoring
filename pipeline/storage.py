@@ -36,7 +36,7 @@ def can_write():
 
 def get_data_path(source, stage="raw", runtime=None):
     '''
-    Returns the formatted file path's naming convention for raw data
+    Returns the formatted file path's naming convention for a specified data type
     '''
     if stage == "raw" and source not in SOURCES:
         raise ValueError(f"{source} isn't a valid source. Choose from {SOURCES}")
@@ -57,8 +57,42 @@ def get_data_path(source, stage="raw", runtime=None):
 
 def write_data(source, data, stage="raw"):
     '''
-    Writes raw data to a GCP file
+    Writes data to a GCP file
     '''
     file_path = get_data_path(source, stage)
     upload_json_to_gcp(data, file_path)
     return file_path
+
+def read_data(file_path):
+    '''
+    Reads data from a GCP file
+    '''
+    bucket = get_bucket()
+    data = bucket.blob(file_path).download_as_bytes()
+    return json.loads(data)
+
+def latest_file_name(source, stage="raw"):
+    '''
+    returns the file path of the newest file inside {stage}/{source}/
+    '''
+    bucket = get_bucket()
+
+    file_names = [
+        blob.name
+        for blob in bucket.list_blobs(prefix=f"{stage}/{source}/")
+        if blob.name.endswith("Z.json")
+    ]
+    if not file_names:
+        raise FileNotFoundError(
+            f"No files found in {GCP_BUCKET_NAME}/{stage}/{source}"
+        )
+    return max(file_names)
+
+def read_latest_file(source, stage="raw"):
+    '''
+    Reads the data and file path of the newest data in a specified source and stage folder
+    '''
+    file_name = latest_file_name(source, stage)
+    data = read_data(file_name)
+    # Return tuple for logging purposes
+    return file_name, data

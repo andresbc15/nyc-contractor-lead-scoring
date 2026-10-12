@@ -3,11 +3,8 @@ import re
 from collections import Counter
 
 from free_email_domains import whitelist
-from google.cloud import storage
+from pipeline import storage
 
-from pipeline.config import GCP_BUCKET_NAME, GCP_PROJECT_ID
-
-# app/routers/licenses.py uploads to raw/dob_licenses/<YYYY-MM-DD>/dob_licenses.json
 LICENSES_PREFIX = "raw/dob_licenses/"
 LICENSES_FILE = "dob_licenses.json"
 TARGET_COLUMNS = [
@@ -27,47 +24,6 @@ PERMIT_LICENSE_TYPES = {
     "SIGN HANGER",
     "OIL BURNER INSTALLER",
 }
-
-
-# TO DO: move to pipeline/storage.py once it exists
-def get_bucket():
-    # No key file: uses Application Default Credentials (gcloud login locally)
-    client = storage.Client(project=GCP_PROJECT_ID)
-    return client.bucket(GCP_BUCKET_NAME)
-
-
-# TO DO: move to pipeline/storage.py once it exists
-def upload_json_to_gcp(bucket, data, blob_name):
-    bucket.blob(blob_name).upload_from_string(
-        json.dumps(data), content_type="application/json"
-    )
-    return blob_name
-
-
-# TO DO: after PR#12, licenses land in raw/licenses/<timestamp>.json, so this prefix stops matching.
-# Move logic to storage.py
-# Generalize to latest_file_name(bucket, prefix) and skip names that don't match the timestamp pattern.
-def latest_licenses_file_name(bucket):
-    file_names = [
-        blob.name
-        for blob in bucket.list_blobs(prefix=LICENSES_PREFIX)
-        if blob.name.endswith(f"/{LICENSES_FILE}")
-    ]
-    if not file_names:
-        raise FileNotFoundError(
-            f"No files found in {GCP_BUCKET_NAME}/{LICENSES_PREFIX}"
-        )
-    return max(file_names)
-
-
-# TO DO: move to storage but file_name output is important to run() because it is used to name output files
-def load_licenses():
-    bucket = get_bucket()
-    file_name = latest_licenses_file_name(bucket)
-    data = bucket.blob(file_name).download_as_bytes()
-    # Return touple for logging purposes
-    return file_name, json.loads(data)
-
 
 def extract_licenses(data):
     extracted_data = []
@@ -154,7 +110,7 @@ def select_scrape_targets(license_domains):
 
 def run():
 
-    file_name, data = load_licenses()
+    file_name, data = storage.read_latest_file("licenses")
 
     print(f"Loaded licenses from {file_name}")
 
@@ -168,29 +124,17 @@ def run():
 
     scrape_targets = select_scrape_targets(data_with_domains)
 
-    # TO DO: This filename logic breaks after PR#12 since the logic in this file gets the date from the filename
-    source_date = file_name.split("/")[2]
-    data_with_domains_blob_name = (
-        f"intermediate/licenses_to_domains/{source_date}/licenses_to_domains.json"
-    )
-    scrape_targets_blob_name = (
-        f"intermediate/website_domains/{source_date}/website_domains.json"
-    )
-
-    # TO DO: remove the follwing since this should busing functions from storage.py
-    bucket = get_bucket()
-
     # Upload licenses with domains
-    upload_json_to_gcp(bucket, data_with_domains, data_with_domains_blob_name)
+    domains_blob = storage.write_data("licenses_to_domains", data_with_domains, stage="intermediate")
 
     # Upload scraping targets
-    upload_json_to_gcp(bucket, scrape_targets, scrape_targets_blob_name)
+    scraping_blob = storage.write_data("website_domains", scrape_targets, stage="intermediate")
 
     return {
         "source": file_name,
         "licenses": len(data_with_domains),
         "scrape_targets": len(scrape_targets),
-        "uploaded": [data_with_domains_blob_name, scrape_targets_blob_name],
+        "uploaded": [domains_blob, scraping_blob],
     }
 
 
