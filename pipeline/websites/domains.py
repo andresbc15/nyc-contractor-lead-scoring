@@ -1,10 +1,21 @@
-import json
 import re
 from collections import Counter
 
 from free_email_domains import whitelist
+
 from pipeline import storage
 
+# Found these non business domains that are missed by whitelist
+NON_BUSINESS_DOMAINS = {
+    "optimum.net",
+    "optonline.net",
+    "verizon.net",
+    "acedsl.com",
+    "att.net",
+    "earthlink.net",
+}
+NON_BUSINESS_SUFFIXES = (".rr.com", ".gov", ".edu")
+FREE_PROVIDER_TYPOS = ("gmail.com", "yahoo.com", "hotmail.com", "aol.com")
 LICENSES_PREFIX = "raw/dob_licenses/"
 LICENSES_FILE = "dob_licenses.json"
 TARGET_COLUMNS = [
@@ -24,6 +35,7 @@ PERMIT_LICENSE_TYPES = {
     "SIGN HANGER",
     "OIL BURNER INSTALLER",
 }
+
 
 def extract_licenses(data):
     extracted_data = []
@@ -63,7 +75,13 @@ def is_valid_email(email):
 def is_business_domain(email):
     domain = email.split("@")[1]
     # whitelist is the package's list of free email providers (personal)
-    return domain not in whitelist
+    if domain in whitelist or domain in NON_BUSINESS_DOMAINS:
+        return False
+    # Handle pectrum, government, and school emails
+    if domain.endswith(NON_BUSINESS_SUFFIXES):
+        return False
+    # Handle typos of free providers that would pass as business
+    return not domain.startswith(FREE_PROVIDER_TYPOS)
 
 
 def extract_business_domain(email):
@@ -75,7 +93,7 @@ def extract_business_domain(email):
     normalized_email = email.strip().lower()
 
     # Check if it is a valid email
-    if not is_valid_email(email):
+    if not is_valid_email(normalized_email):
         return None, "Invalid"
 
     # Check if it is a business domain
@@ -125,10 +143,14 @@ def run():
     scrape_targets = select_scrape_targets(data_with_domains)
 
     # Upload licenses with domains
-    domains_blob = storage.write_data("licenses_to_domains", data_with_domains, stage="intermediate")
+    domains_blob = storage.write_data(
+        "licenses_to_domains", data_with_domains, stage="intermediate"
+    )
 
     # Upload scraping targets
-    scraping_blob = storage.write_data("website_domains", scrape_targets, stage="intermediate")
+    scraping_blob = storage.write_data(
+        "website_domains", scrape_targets, stage="intermediate"
+    )
 
     return {
         "source": file_name,
