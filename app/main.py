@@ -18,5 +18,5 @@ def get_dob_data():
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="API Call failed")
     data = response.json()
-    blob_name = storage.write_raw("permits", data)
+    blob_name = storage.write_data("permits", data)
     return {"uploaded": blob_name, "rows": len(data)}
