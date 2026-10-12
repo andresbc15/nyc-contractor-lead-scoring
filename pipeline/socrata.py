@@ -6,7 +6,8 @@ BASE_URL = "https://data.cityofnewyork.us/api/v3/views"
 def clean_keys(original_dict: dict) -> dict:
     return {key.lstrip(":"): value for key, value in original_dict.items()}
 
-def fetch(dataset_id, max_rows, order=":id"):
+
+def fetch(dataset_id, max_rows, order=":id", where=None):
 
     # Initialize
     url = f"{BASE_URL}/{dataset_id}/query.json"
@@ -19,7 +20,7 @@ def fetch(dataset_id, max_rows, order=":id"):
         params = {
                 "pageNumber": page_number,
                 "pageSize": max_rows,
-                "query": f"SELECT * ORDER BY {order}"
+                "query": f"SELECT * WHERE {where} ORDER BY {order}" if where else f"SELECT * ORDER BY {order}"
             }
         
         # Make the request
