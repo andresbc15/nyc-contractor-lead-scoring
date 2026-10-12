@@ -4,3 +4,4 @@ python-dotenv
 google-auth
 google-cloud-storage
 pydantic
+free-email-domains

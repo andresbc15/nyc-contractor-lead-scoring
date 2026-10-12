@@ -8,6 +8,7 @@ from google.oauth2 import service_account
 from pipeline.config import GCP_BUCKET_NAME, GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_KEY
 
 SOURCES = {"permits", "licenses", "websites"}
+STAGES = {"raw", "intermediate", "processed"}
 
 def get_bucket():
     if not GCP_SERVICE_ACCOUNT_KEY:
@@ -33,27 +34,31 @@ def can_write():
         return False
     return True
 
-def raw_data_path(source, runtime=None):
+def get_data_path(source, stage="raw", runtime=None):
     '''
     Returns the formatted file path's naming convention for raw data
     '''
-    if source not in SOURCES:
+    if stage == "raw" and source not in SOURCES:
         raise ValueError(f"{source} isn't a valid source. Choose from {SOURCES}")
+    if stage not in STAGES:
+        raise ValueError(f"{stage} isn't a valid data stage. Choose from {STAGES}")
     if runtime is None:
         runtime = datetime.now(timezone.utc)
+
     year = runtime.strftime("%Y")
     month = runtime.strftime("%m")
     day = runtime.strftime("%d")
     hour = runtime.strftime("%H")
     minute = runtime.strftime("%M")
     seconds = runtime.strftime("%S")
-    file_path = f"raw/{source}/{year}_{month}_{day}_{hour}_{minute}_{seconds}Z.json"
+
+    file_path = f"{stage}/{source}/{year}_{month}_{day}_{hour}_{minute}_{seconds}Z.json"
     return file_path
 
-def write_raw(source, data):
+def write_data(source, data, stage="raw"):
     '''
     Writes raw data to a GCP file
     '''
-    file_path = raw_data_path(source)
+    file_path = get_data_path(source, stage)
     upload_json_to_gcp(data, file_path)
     return file_path

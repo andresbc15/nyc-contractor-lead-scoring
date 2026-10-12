@@ -22,6 +22,6 @@ def extract_licenses(max_rows: int = 1000):
         raise HTTPException(status_code=500, detail=f"Socrata returned {status}")
 
     rows = [record.model_dump(mode="json") for record in records]
-    blob_name = storage.write_raw("licenses", rows)
+    blob_name = storage.write_data("licenses", rows)
 
     return {"dataset": licenses.DATASET_ID, "rows": len(rows), "uploaded": blob_name}
