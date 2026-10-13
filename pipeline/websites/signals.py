@@ -1,5 +1,7 @@
 from bs4 import BeautifulSoup
 
+from pipeline import storage
+
 KEY_PHRASES = {
     "has_online_payment": [
         "pay online",
@@ -88,3 +90,39 @@ def extract_signals(html):
     signals["accounting_tools"] = find_tools(html_lowered, ACCOUNTING_DOMAINS)
     signals["pay_links"] = find_pay_links(html_lowered)
     return signals
+
+
+def run():
+    """
+    Extract signals from all websites and upload to GCP
+    """
+    _, rows = storage.read_all_files("websites")
+
+    # Initialize results and error logging
+    results = []
+    errors = {}
+
+    # Extract signals and join with the domain
+    for row in rows:
+        if row["html"] is None or row["error"] is not None:
+            continue
+        try:
+            signals = extract_signals(row["html"])
+            signals["domain"] = row["domain"]
+            results.append(signals)
+        except Exception as e:
+            errors[row["domain"]] = type(e).__name__
+
+    # Upload the signals
+    blob_name = storage.write_data("website_signals", results, stage="intermediate")
+
+    # Return a summary
+    return {
+        "domains": len(results),
+        "errors": errors,
+        "uploaded": blob_name,
+    }
+
+
+if __name__ == "__main__":
+    print(run())
