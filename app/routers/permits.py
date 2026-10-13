@@ -9,17 +9,18 @@ router = APIRouter(prefix="/extract")
 
 
 @router.post("/permits")
-def extract_permits(since: str | None = None):
+def extract_permits(since: str | None = None, backfill: bool = False):
     if not storage.can_write():
         raise HTTPException(status_code=500, detail=f"Current credentials cannot upload to bucket '{GCP_BUCKET_NAME}'")
 
     try:
-        records = permits.extract(since=since)
+        records = permits.extract(since=since, backfill=backfill)
     except requests.HTTPError as e:
         status = e.response.status_code
         print(f"NYC Open Data returned {status}: {e}")
         raise HTTPException(status_code=500, detail=f"NYC Open Data returned {status}")
-
+    if not records:
+        return {"rows": 0, "uploaded": None}
     rows = [record.model_dump(mode="json") for record in records]
     blob_name = storage.write_data("permits", rows)
 

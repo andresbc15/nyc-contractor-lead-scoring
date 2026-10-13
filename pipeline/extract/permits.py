@@ -1,4 +1,5 @@
 from pydantic import ValidationError
+from datetime import date, timedelta
 
 from pipeline import socrata
 from pipeline.contracts.permits import PermitRecord
@@ -8,16 +9,22 @@ PAGE_SIZE = 50000
 BACKFILL_START = "2025-01-01"
 
 
-def extract(since=None):
+def extract(since=None, backfill=False):
 
-    if since is None:
+    if backfill:
         where = f"issued_date >= '{BACKFILL_START}'"
     else:
+        if since is None:
+            since = (date.today() - timedelta(days=1)).isoformat()
         where = f":updated_at > '{since}'"
 
     rows = socrata.fetch(dataset_id=DATASET_ID, max_rows=PAGE_SIZE, where=where)
     if not rows:
-        raise ValueError("No permits returned from NYC")
+        if backfill:
+            raise ValueError("Backfill returned no permits from NYC")
+        print(f"No permits changed since {since}")
+        return []
+
 
     correct_rows = []
     errors = 0
