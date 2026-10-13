@@ -10,7 +10,8 @@ router = APIRouter(prefix="/websites")
 @router.post("/scrape")
 def scrape_websites(limit: int = 100):
     """
-    Scrapes the next batch of website domains that haven't been scraped yet
+    Scrapes the next batch of website domains that haven't been scraped yet and extracts the signals for all websites that have been scraped.
+    Added signals.run() here since we are limited to three Cloudrun jobs and have a similar requirment for frequency.
     """
     # Check bucket access before scraping, so missing access fails immediately.
     if not storage.can_write():
