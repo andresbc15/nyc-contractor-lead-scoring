@@ -17,6 +17,6 @@ def send_table(table: str):
     try:
         df = storage.read_parquet(table)
     except (Exception) as e:
-        raise HTTPException(status_code=404, detail=f"{table} is not generated yet")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
     table_data = json.loads(df.to_json(orient="records", date_format="iso"))
     return {"table": table, "rows": len(table_data), "data": table_data}

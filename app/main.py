@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import licenses, permits, websites
+from app.routers import licenses, permits, websites, data
 
 app = FastAPI()
 app.include_router(licenses.router)

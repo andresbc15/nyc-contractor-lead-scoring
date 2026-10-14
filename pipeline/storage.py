@@ -1,5 +1,6 @@
 import io
 import json
+import pandas as pd
 from datetime import UTC, datetime
 
 from google.cloud import storage
@@ -137,3 +138,14 @@ def write_parquet(data, name):
     data.to_parquet(buffer, index=False)
     bucket.blob(file_path).upload_from_string(buffer.getvalue(), content_type="application/octet-strem")
     return file_path
+
+def read_parquet(name):
+    """
+    Returns a dataframe from parquet. 
+    """
+    bucket = get_bucket()
+    file_path = f"processed/{name}.parquet"
+    file_bytes = bucket.blob(file_path).download_as_bytes()
+    data = io.BytesIO(file_bytes)
+    df = pd.read_parquet(data)
+    return df
