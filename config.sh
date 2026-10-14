@@ -2,7 +2,7 @@
 
 ENV_FILE=".env"
 if [ ! -f "$ENV_FILE" ]; then
-    echo "Error bruh: '$ENV_FILE' not found. Run: 
+    echo "Error: '$ENV_FILE' not found. Run: 
     cp .env_template .env" >&2
     exit 1
 fi
@@ -20,11 +20,9 @@ API_SERVICE="nyc-api-server"
 
 WEB_SERVICE="nyc-leads-dashboard"
 
-#TODO: Fill
-API_DIR="<FILL_DIR_NAME>"
+API_DIR="."
 
-#TODO: Fill
-WEB_DIR="<FILL_DIR_NAME>"
+WEB_DIR="./dashboard"
 
 API_PORT=8000
 
@@ -48,9 +46,9 @@ ATTEMPT_DEADLINE="1800s"
 MAX_RETRIES=1
 
 JOBS=(
-    # TODO: schedule/make jobs
-    "<FILL_JOB_NAME>|* * * * *|<FILL_ENDPOINT_URL>"
-    "<FILL_JOB_NAME>|* * * * *|<FILL_ENDPOINT_URL>"
+    "collect-permits|0 6 * * *|/extract/permits"
+    "collect-licenses|30 6 * * 1|/extract/licenses"
+    "collect-websites|0 7 * * *|/websites/scrape"
 ) # Data extraction jobs (Max 3 Jobs to stay in the free tier)
 
 
