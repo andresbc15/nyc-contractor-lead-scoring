@@ -3,6 +3,7 @@
 # joining all three sources, aggregates by trade and company size
 
 import pandas as pd
+from pipeline import storage
 
 # permit codes -> registry name because the join uses type and number
 # NOTE: PE/RA/PR are left out because they had no matching DOB license category
@@ -77,7 +78,6 @@ def aggregate(joined):
     data = joined.copy()
     # one ID per contractor: license type + number (note: numbers repeat across types)
     data["contractor_id"] = data["permittee_s_license_type"] + "-" + data["lic_norm"].astype(str)
-
     # PE/RA/PR are engineers/architects who file permits, not contractors
     is_contractor = data["license_type_full"].notna()
     data.loc[~is_contractor, "contractor_id"] = None
@@ -112,6 +112,28 @@ def aggregate(joined):
         "monthly": summarize(data, ["month", "work_type"]),
         "by_borough": summarize(data, "borough"),
     }
+
+def load_all(source):
+    """Reads every raw file for a source and combines them into one table """
+    bucket = storage.get_bucket()
+    paths = sorted(blob.name
+                   for blob in bucket.list_blobs(prefix=f"raw/{source}/")
+                   if blob.name.endswith("Z.json"))
+    frames = [pd.DataFrame(storage.read_data(path)) for path in paths]
+    return pd.concat(frames, ignore_index=True)
+
+def run():
+    """Reads raw data from the bucket, transforms it and saves all the tables to processed/ """
+    permits = load_all("permits")
+    # each licenses file is a full registry snapshot so the newest will be enough
+    _, licenses_data = storage.read_latest_file("licenses")
+    licenses = pd.DataFrame(licenses_data)
+
+    clean = clean_permits(permits)
+    joined = joint_resources(clean, licenses)
+    tables = aggregate(joined)
+
+    return {name: storage.write_parquet(data, name) for name, data in tables.items()}
 
 if __name__ == "__main__":
     print("Transform skeleton: functions have not been written yet :(")
