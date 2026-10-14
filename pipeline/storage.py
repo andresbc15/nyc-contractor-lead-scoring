@@ -1,3 +1,4 @@
+import io
 import json
 from datetime import UTC, datetime
 
@@ -125,3 +126,14 @@ def read_all_files(source, stage="raw"):
         rows.extend(read_data(file_name))
 
     return file_names, rows
+
+def write_parquet(data, name):
+    '''
+    Saves the data as parquet to processed/<name>.parquet and returns the file path
+    '''
+    bucket = get_bucket()
+    file_path = f"processed/{name}.parquet"
+    buffer = io.BytesIO()
+    data.to_parquet(buffer, index=False)
+    bucket.blob(file_path).upload_from_string(buffer.getvalue(), content_type="application/octet-strem")
+    return file_path
