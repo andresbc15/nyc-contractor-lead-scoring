@@ -7,3 +7,4 @@ pydantic
 free-email-domains
 bs4
 pandas
+pyarrow
