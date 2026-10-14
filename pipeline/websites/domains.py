@@ -147,7 +147,7 @@ def run():
         "licenses_to_domains", data_with_domains, stage="intermediate"
     )
 
-    # Upload scraping targets
+    # Upload scraping targets, the counts of each domain
     scraping_blob = storage.write_data(
         "website_domains", scrape_targets, stage="intermediate"
     )
