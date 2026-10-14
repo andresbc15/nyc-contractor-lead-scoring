@@ -8,7 +8,7 @@ source ./config.sh
 for _var in PROJECT_ID BUCKET REGION API_SERVICE WEB_SERVICE API_DIR WEB_DIR \
             API_PORT WEB_PORT RUNTIME_SA DOB_TOKEN_SECRET SCHEDULER_TZ; do
   if [ -z "${!_var:-}" ]; then
-    echo "ERROR: $_var is empty -- set it in .env or config.sh." >&2
+    echo "Error: $_var is empty -- set it in .env or config.sh." >&2
     exit 1
   fi
 done
@@ -24,7 +24,7 @@ APP_ENV+=",DOB_APP_TOKEN_ID=${DOB_APP_TOKEN_ID:-}"
 # ==== First Time Project Setup ====
 init() {
     if [ -z "${DOB_APP_TOKEN:-}" ]; then
-        echo "Error bruh: DOB_APP_TOKEN is empty in .env" >&2
+        echo "Error: DOB_APP_TOKEN is empty in .env" >&2
         exit 1
     fi
 
@@ -52,7 +52,12 @@ init() {
     if ! gcloud secrets describe "$DOB_TOKEN_SECRET" >/dev/null 2>&1; then
         gcloud secrets create "$DOB_TOKEN_SECRET" --replication-policy=automatic
     fi
-    printf '%s' "$DOB_APP_TOKEN" | gcloud secrets versions add "$DOB_TOKEN_SECRET" --data-file=-
+    current=$(gcloud secrets versions access latest --secret="$DOB_TOKEN_SECRET" 2>/dev/null || true)
+    if [ "$current" != "$DOB_APP_TOKEN" ]; then
+        printf '%s' "$DOB_APP_TOKEN" | gcloud secrets versions add "$DOB_TOKEN_SECRET" --data-file=-
+    else
+        echo "DOB token unchanged, no new version added"
+    fi
 
     log "Letting ${RUNTIME_SA} read the DOB token"
     gcloud secrets add-iam-policy-binding "$DOB_TOKEN_SECRET" \
@@ -63,7 +68,7 @@ init() {
 # ==== API SERVICE ====
 deploy_api(){
     if [ ! -f "$API_DIR/Dockerfile" ]; then
-        echo "Error bruh: no Dockerfile in '$API_DIR'." >&2
+        echo "Error: no Dockerfile in '$API_DIR'." >&2
         exit 1
     fi
 
@@ -77,16 +82,28 @@ deploy_api(){
         --max-instances=1 \
         --service-account="$RUNTIME_SA" \
         --set-env-vars="$APP_ENV" \
-        --set-secrets="DOB_APP_TOKEN=$DOB_TOKEN_SECRET:latest"
+        --set-secrets="DOB_APP_TOKEN=$DOB_TOKEN_SECRET:latest" \
+        --quiet
 }
 
 api_url(){
     local url
     url=$(gcloud run services describe "$API_SERVICE" \
-    --region "$REGION" --format="value(status.url)")
+    --region "$REGION" --format="value(status.url)" 2>/dev/null || true)
     if [ -z "$url" ]; then
-        echo "Error bruh: could not find the URL for '$API_SERVICE' in $REGION. Deploy it first" >&2
-        exit 1
+        echo "Error: could not find the URL for '$API_SERVICE' in $REGION. Deploy it first" >&2
+        return 1
+    fi
+    echo "$url"
+}
+
+web_url(){
+  local url
+    url=$(gcloud run services describe "$WEB_SERVICE" \
+    --region "$REGION" --format="value(status.url)" 2>/dev/null || true)
+    if [ -z "$url" ]; then
+        echo "Error: could not find the URL for '$WEB_SERVICE' in $REGION. Deploy it first" >&2
+        return 1
     fi
     echo "$url"
 }
@@ -94,11 +111,13 @@ api_url(){
 # ==== WEB APP ====
 deploy_web() {
   if [ ! -f "$WEB_DIR/Dockerfile" ]; then
-    echo "ERROR: no Dockerfile in '$WEB_DIR'." >&2
+    echo "Error: no Dockerfile in '$WEB_DIR'." >&2
     exit 1
   fi
   local url; url="$(api_url)"
 
+
+  # the dashboard never calls Socrata from --set-env-vars
   log "Deploying ${WEB_SERVICE} from ${WEB_DIR}, pointing at ${url}"
   gcloud run deploy "$WEB_SERVICE" \
     --source "$WEB_DIR" \
@@ -107,7 +126,8 @@ deploy_web() {
     --allow-unauthenticated \
     --max-instances=1 \
     --service-account="$RUNTIME_SA" \
-    --set-env-vars="${APP_ENV},API_SERVICE_URL=${url}"   # no secrets: the dashboard never calls Socrata
+    --set-env-vars="${APP_ENV},API_SERVICE_URL=${url}" \
+    --quiet
 }
 
 # ==== CLOUD SCHEDULER ====
@@ -143,9 +163,11 @@ deploy_scheduler() {
 }
 
 show_urls() {
-  echo "API     : $(api_url)   (docs: $(api_url)/docs)"
-  echo "Web app : $(gcloud run services describe "$WEB_SERVICE" \
-    --region "$REGION" --format='value(status.url)' 2>/dev/null || echo 'not deployed')"
+  local api web
+  api="$(api_url)"
+  web="$(web_url || true)"
+  echo "API     : ${api}   (docs: ${api}/docs)"
+  echo "Web app : ${web:-not deployed}"
 }
 
 # ==== ENTRY POINT ====
