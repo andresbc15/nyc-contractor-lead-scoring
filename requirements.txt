@@ -5,4 +5,5 @@ google-auth
 google-cloud-storage
 pydantic
 free-email-domains
+bs4
 pandas
