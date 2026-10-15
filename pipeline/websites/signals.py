@@ -92,18 +92,14 @@ def extract_signals(html):
     return signals
 
 
-def run():
-    """
-    Extract signals from all websites and upload to GCP
-    """
-    _, rows = storage.read_all_files("websites")
-
+def extract_signals_from_rows(rows):
     # Initialize results and error logging
     results = []
     errors = {}
 
     # Extract signals and join with the domain
     for row in rows:
+        # Skip websites that we failed to get
         if row["html"] is None or row["error"] is not None:
             continue
         try:
@@ -113,12 +109,53 @@ def run():
         except Exception as e:
             errors[row["domain"]] = type(e).__name__
 
+    return results, errors
+
+
+def run(new_rows=None):
+    """
+    Extract signals from newly scraped websites and add them to the running list of
+    scraped websites
+    """
+    if new_rows is None:
+        # Read every raw html file if starting fresh
+        _, new_rows = storage.read_all_files("websites")
+        previous = []
+    else:
+        # Nothing new scraped this run
+        if not new_rows:
+            return {
+                "domains": 0,
+                "errors": {},
+                "uploaded": None,
+            }
+        # Load the results from last run so we can merge with the new results
+        try:
+            _, previous = storage.read_latest_file(
+                "website_signals", stage="intermediate"
+            )
+        except FileNotFoundError:
+            previous = []
+
+    # Extract the signals from the new rows from scrape.run()
+    results, errors = extract_signals_from_rows(new_rows)
+
+    # Domains in this batch
+    new_domains = {row["domain"] for row in results}
+
+    # Drop old domains
+    filtered = [row for row in previous if row["domain"] not in new_domains]
+
+    # Combine to have the most up to date list
+    all_signals = filtered + results
+
     # Upload the signals
-    blob_name = storage.write_data("website_signals", results, stage="intermediate")
+    blob_name = storage.write_data("website_signals", all_signals, stage="intermediate")
 
     # Return a summary
     return {
         "domains": len(results),
+        "total_domains": len(all_signals),
         "errors": errors,
         "uploaded": blob_name,
     }
