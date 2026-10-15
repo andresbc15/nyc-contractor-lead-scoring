@@ -8,10 +8,13 @@ router = APIRouter(prefix="/websites")
 
 
 @router.post("/scrape")
-def scrape_websites(limit: int = 100):
+def scrape_websites(limit: int = 300):
     """
-    Scrapes the next batch of website domains that haven't been scraped yet and extracts the signals for all websites that have been scraped.
-    Added signals.run() here since we are limited to three Cloudrun jobs and have a similar requirment for frequency.
+    - Scrapes the next batch of website domains (up to limit) that haven't been scraped
+    yet and extracts the signals for that batch
+    - Saves html to raw/websites/ and updates the running list of scraped website (intermediate/website_status)
+    - Uploads running collection of signals to intermediate/website_signals/
+    - Returns "skipped" if there are no scrape targets yet (run POST /extract/licenses first)
     """
     # Check bucket access before scraping, so missing access fails immediately.
     if not storage.can_write():
@@ -21,20 +24,16 @@ def scrape_websites(limit: int = 100):
         )
 
     try:
-        summary = scrape.run(limit)
+        summary, results = scrape.run(limit)
     except FileNotFoundError as e:
-        print(f"Scrape step failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "failed",
-                "step": "scrape",
-                "error": f"{type(e).__name__}: {e}",
-            },
-        )
+        print(f"Scrape skipped: {e}")
+        return {
+            "status": "skipped",
+            "reason": "No scrape target yet. POST /extract/licenses first",
+        }
 
     try:
-        signals_summary = signals.run()
+        signals_summary = signals.run(results)
     except FileNotFoundError as e:
         print(f"Signals step failed: {e}")
         raise HTTPException(

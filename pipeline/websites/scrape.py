@@ -81,7 +81,7 @@ def fetch_html(domain):
     }
 
 
-def run(limit=100):
+def run(limit=300):
 
     # Check if there are any websites to scrape
     try:
@@ -106,10 +106,11 @@ def run(limit=100):
 
     # No target or every domain already scraped
     if not targets:
-        return {"source": file_name, "domains": 0, "errors": {}, "uploaded": None}
+        # return an empty batch so signals has nothing to do
+        return {"source": file_name, "domains": 0, "errors": {}, "uploaded": None}, []
 
-    # Fetch 10 websites at a time
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    # Fetch 20 websites at a time
+    with ThreadPoolExecutor(max_workers=20) as executor:
         results = list(executor.map(fetch_html, [t["domain"] for t in targets]))
 
     # Make a list of websites that were scraped so we can reference later
@@ -126,14 +127,15 @@ def run(limit=100):
         "website_status", scraped + scraped_website_status, stage="intermediate"
     )
 
-    # Return a summary
+    # Return a summary and results of this batch so signals will only process new websites
     return {
         "source": file_name,
         "domains": len(results),
         "errors": dict(Counter(row["error"] for row in results)),
         "uploaded": [blob_name, status_blob_name],
-    }
+    }, results
 
 
 if __name__ == "__main__":
-    print(run())
+    summary, _ = run()
+    print(summary)
