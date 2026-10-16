@@ -14,6 +14,10 @@ TYPE_MAP = { "GC": "GENERAL CONTRACTOR", "P":
 
 SIZE_BINS = [0, 5, 39, 249, float("inf")]
 SIZE_LABELS = ["Small", "Mid", "Large", "Very large"]
+# lead score settings - frequency and job values count equally
+# Small/Mid firms rank above Large ones, cause they are more likely to have payment systems in place already
+SCORE_WEIGHTS = {"frequency": 0.5, "value": 0.5}
+SIZE_FACTOR = {"Small": 1.0, "Mid": 1.0, "Large": 0.7, "Very large": 0.4}
 
 def clean_permits(permits):
     """Fix types, drop duplicates, handle missing job costs."""
@@ -102,7 +106,26 @@ def aggregate(joined):
     ).reset_index()
     contractors["size_tier"] = pd.cut(contractors["n_permits"], bins=SIZE_BINS, labels=SIZE_LABELS)
 
-    # giving every permit its contractor's size tier, for the trade x size table
+    # lead score: ranking contractors 0-1 on frequency and job value and then combining them
+    # with the weights, then scaled by size so small/mid firms rank above large ones
+    months = max((data["issued_date"].max() - data["issued_date"].min()).days / 30.44, 1)
+    contractors["permits_per_month"] = (contractors["n_permits"] / months).round(2)
+
+    freq_rank = contractors["permits_per_month"].rank(pct=True)
+    value_rank = contractors["median_job_cost"].rank(pct=True).fillna(0)  
+    size_factor = contractors["size_tier"].map(SIZE_FACTOR).astype(float)
+
+    contractors["lead_score"] = (
+        100 * (SCORE_WEIGHTS["frequency"] * freq_rank + SCORE_WEIGHTS["value"] * value_rank) * size_factor
+    ).round(1)
+
+    # only the active licenses with a permit in the last 6 months will be counted as current leads
+    cutoff = data["issued_date"].max() - pd.DateOffset(months=6)
+    contractors["is_current_lead"] = (contractors["license_status"] == "ACTIVE") & (contractors["last_permit"] >= cutoff)
+
+    contractors = contractors.sort_values("lead_score", ascending=False)
+
+    # giving every permit its contractor's size tier for the trade x size table
     data = data.merge(contractors[["contractor_id", "size_tier"]], on="contractor_id", how="left")
 
     return {
