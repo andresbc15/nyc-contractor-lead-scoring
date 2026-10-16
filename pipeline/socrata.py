@@ -27,7 +27,7 @@ def fetch(dataset_id, max_rows, order=":id", where=None):
         response = requests.get(
             url,
             params=params,
-            auth=(DOB_APP_TOKEN_ID, DOB_APP_TOKEN),
+            headers={"X-App-Token": DOB_APP_TOKEN_ID},
             timeout=180
         )
 
