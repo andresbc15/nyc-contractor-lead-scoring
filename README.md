@@ -10,6 +10,7 @@ Which New York City trade contractors look like high-value leads for a B2B payme
 | Andres Javier Miguel Cojuangco | andresbc15 | License, email, and contract extraction + HTML storage |
 | Joseph Lacap | Joseph5105 | GCP project, bucket and service accounts + scheduled collection of all sources|
 | Disha Khati | dkhati2 | Python transformation + streamlit dashboard, team contract|
+
 ---
 
 ## Problem Statement
@@ -38,7 +39,7 @@ The App Token required to access sources 1 and 2 should be held in the DOB_APP_T
 
 ### Prerequisites
 - Python 3.11+
-- A GCP service account key with access to the "nyc-contractor-leads-table-data" bucket in the project "nyc-contractor-lead-scoring"
+- Access to the "nyc-contractor-leads-table-data" bucket in the project "nyc-contractor-leads" or a fresh project.
 - A free app token for the NYC Open Data website
 
 ### 1. Clone the repository
@@ -73,8 +74,13 @@ cp .env_template .env
 | `GCP_BUCKET_NAME` | Name of the required bucket inside the GCP project | `nyc-contractor-leads-table-data` |
 | `GCP_SERVICE_ACCOUNT_KEY` | Absolute path to your service account JSON | `/Users/you/.ssh/key.json` |
 | `DOB_APP_TOKEN` | Free App Token for the NYC Open Data website | `Tl2qxxxxxxxxxxKPd` |
+| `DOB_APP_TOKEN_ID` | Associated secret ID with the DOB APP Token | `abc123xxxxxxxx` |
 
 **How to get the DOB app token:** sign up or sign in at [data.cityofnewyork.us](https://data.cityofnewyork.us), go to your profile, open Developer Settings and click Create New App Token. Copy the App Token (not the Secret Token) into `.env` as `DOB_APP_TOKEN`.
+
+**Fill in `.env`.** Replace each description with the real value. The scripts `source` this file, so:
+   - write `KEY=value` with no spaces around `=` and no spaces in the value
+   - don't leave the template's description text after the `=`
 
 The GCP_SERVICE_ACCOUNT_KEY is not required. Can leave it blank and alternatively run 
 ```bash
@@ -97,23 +103,62 @@ Writes to a new file in raw/{name}/ where name = {"permits", "licenses", "scrape
 
 Files are formatted as <stage>/<name>/YYYY_MM_DD_HH_MM_SSZ.json.
 
+`GET /data/{table}` is another endpoint that returns a GCP table (`contractors`, `by_trade`, `by_trade_size`, `monthly`, `by_borough`) as JSON for the Streamlit dashboard. It reads `processed/<table>.parquet`.
+
 ---
 
 ## Remote Deployment
-Install gcloud from the link below and login:
-[https://docs.cloud.google.com/sdk/docs/install-sdk](https://docs.cloud.google.com/sdk/docs/install-sdk)
+
+How to deploy and schedule the project on Google Cloud with `gcp_script.sh`.
+Everything runs in the contained GCP_PROJECT_ID, region `us-west1`, and stays inside the free tier.
+
+### 1. What gets deployed
+
+| Piece | Name | What it does |
+|---|---|---|
+| Cloud Run service | `nyc-api-server` | FastAPI app (`app/` + `pipeline/`). Collects data and writes it to the bucket |
+| Cloud Run service | `nyc-leads-dashboard` | Streamlit app (`dashboard/`). Shows the data |
+| Cloud Scheduler job | `collect-permits` | `POST /extract/permits` every day at 6:00 PT |
+| Cloud Scheduler job | `collect-licenses` | `POST /extract/licenses` every Monday at 6:30 PT |
+| Cloud Scheduler job | `collect-websites` | `POST /websites/scrape` every day at 7:00 PT |
+| Secret Manager | `socrata-app-token` | The NYC Open Data token (`DOB_APP_TOKEN`) |
+
+Both services run as the `pipeline-uploader` service account, so **nobody needs a service account key**.
+You don't need Docker installed either: `gcloud run deploy --source` uploads the folder, and Cloud Build builds the image in the cloud.
+
+### 2. Commands
+
+Run from the repo root (or anywhere, since the script `cd`s to its own folder).
+
+| Command | What it does |
+|---|---|
+| `./gcp_script.sh init` | Enables the APIs, grants Cloud Build its role, uploads `DOB_APP_TOKEN` to Secret Manager (only if it changed), lets `pipeline-uploader` read it |
+| `./gcp_script.sh api` | Builds and deploys the FastAPI service |
+| `./gcp_script.sh scheduler` | Deletes and recreates every job in `JOBS`, then fires each once |
+| `./gcp_script.sh web` | Builds and deploys the Streamlit dashboard, pointed at the API |
+| `./gcp_script.sh urls` | Prints the API URL, its `/docs` page, and the dashboard URL |
+| `./gcp_script.sh all` | `init` → `api` → `scheduler` → `web` → `urls` (first-time setup) |
+
+**Make the script runnable** (only if `./gcp_script.sh` says "permission denied")
 ```bash
-gcloud auth login
+chmod +x gcp_script.sh
 ```
 
-Fill in all #TODO's in config.sh (API_DIR, WEB_DIR, and JOBS), then run the following command:
-
+**Fresh project (grader):** fill in `.env` with your own project, bucket and token, create a `pipeline-uploader`
+service account with **Storage Object Admin** on the bucket, then:
 ```bash
 ./gcp_script.sh all
 ```
 
-This runs as a service account with no key file. It deploys the API, creates and runs the scheduler jobs, then deploys the dashboard and prints the URLs.
-Instead of all, can also use "init", "api", "scheduler", "web", and "urls" for individual steps.
+### 3. Check that it worked
+
+```bash
+./gcp_script.sh urls                                         # both URLs
+
+gcloud storage ls -r gs://<GCP_BUCKET_NAME>/raw/   # today's files
+```
+
+**FastAPI docs:** open `<API URL>/docs` to see every endpoint and try them from the browser.
 
 ---
 ## Repository Structure
