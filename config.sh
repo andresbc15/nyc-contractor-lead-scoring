@@ -31,7 +31,8 @@ WEB_PORT=8501
 API_TIMEOUT=1800
 
 # Both services run as this account, so the code gets its GCS access with no key file
-RUNTIME_SA="pipeline-uploader@${PROJECT_ID}.iam.gserviceaccount.com"
+RUNTIME_SA_NAME="pipeline-uploader"
+RUNTIME_SA="${RUNTIME_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # ==== SECRET MANAGER ==== (names only: values from .env)
 
