@@ -6,7 +6,7 @@ source ./config.sh
 
 # ==== VALIDATION ====
 for _var in PROJECT_ID BUCKET REGION API_SERVICE WEB_SERVICE API_DIR WEB_DIR \
-            API_PORT WEB_PORT RUNTIME_SA DOB_TOKEN_SECRET SCHEDULER_TZ; do
+            API_PORT WEB_PORT RUNTIME_SA_NAME RUNTIME_SA DOB_TOKEN_SECRET SCHEDULER_TZ; do
   if [ -z "${!_var:-}" ]; then
     echo "Error: $_var is empty -- set it in .env or config.sh." >&2
     exit 1
@@ -36,7 +36,24 @@ init() {
         artifactregistry.googleapis.com \
         cloudscheduler.googleapis.com \
         secretmanager.googleapis.com \
-        storage.googleapis.com
+        storage.googleapis.com \
+        iam.googleapis.com
+
+    log "Creating service account ${RUNTIME_SA} if there is none yet"
+    if ! gcloud iam service-accounts describe "$RUNTIME_SA" >/dev/null 2>&1; then
+        gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
+            --display-name="Pipeline runtime (Cloud Run)"
+    fi
+
+    log "Creating bucket gs://${BUCKET} if there is none yet"
+    if ! gcloud storage buckets describe "gs://${BUCKET}" >/dev/null 2>&1; then
+        gcloud storage buckets create "gs://${BUCKET}" --location="$REGION"
+    fi
+
+    log "Letting ${RUNTIME_SA} read and write gs://${BUCKET}"
+    gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
+        --member="serviceAccount:${RUNTIME_SA}" \
+        --role=roles/storage.objectAdmin >/dev/null
 
     local project_number compute_sa
     project_number=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
