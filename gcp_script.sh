@@ -38,6 +38,9 @@ init() {
         storage.googleapis.com \
         iam.googleapis.com
 
+    log "Waiting 60s for the APIs to finish turning on"
+    sleep 60
+
     log "Creating service account ${RUNTIME_SA} if there is none yet"
     if ! gcloud iam service-accounts describe "$RUNTIME_SA" >/dev/null 2>&1; then
         gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
