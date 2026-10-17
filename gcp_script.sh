@@ -97,7 +97,8 @@ deploy_api(){
         --allow-unauthenticated \
         --timeout="$API_TIMEOUT" \
         --max-instances=1 \
-        --memory=2Gi \
+        --memory=4Gi \
+        --cpu=2 \
         --service-account="$RUNTIME_SA" \
         --set-env-vars="$APP_ENV" \
         --set-secrets="DOB_APP_TOKEN=$DOB_TOKEN_SECRET:latest" \
