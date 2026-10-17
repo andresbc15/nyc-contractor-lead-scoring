@@ -1,7 +1,9 @@
 import requests
-from pipeline.config import DOB_APP_TOKEN_ID, DOB_APP_TOKEN
+
+from pipeline.config import DOB_APP_TOKEN
 
 BASE_URL = "https://data.cityofnewyork.us/api/v3/views"
+
 
 def clean_keys(original_dict: dict) -> dict:
     return {key.lstrip(":"): value for key, value in original_dict.items()}
@@ -18,17 +20,16 @@ def fetch(dataset_id, max_rows, order=":id", where=None):
     while True:
         # Build params in loop so page_number updates
         params = {
-                "pageNumber": page_number,
-                "pageSize": max_rows,
-                "query": f"SELECT * WHERE {where} ORDER BY {order}" if where else f"SELECT * ORDER BY {order}"
-            }
-        
+            "pageNumber": page_number,
+            "pageSize": max_rows,
+            "query": f"SELECT * WHERE {where} ORDER BY {order}"
+            if where
+            else f"SELECT * ORDER BY {order}",
+        }
+
         # Make the request
         response = requests.get(
-            url,
-            params=params,
-            headers={"X-App-Token": DOB_APP_TOKEN_ID},
-            timeout=180
+            url, params=params, headers={"X-App-Token": DOB_APP_TOKEN}, timeout=180
         )
 
         # Raise errors

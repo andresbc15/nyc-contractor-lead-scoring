@@ -19,7 +19,6 @@ log() { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
 # Plain (non-secret) env vars for both Cloud Run services.
 # No GCP_SERVICE_ACCOUNT_KEY: with it unset, pipeline/storage.py logs in as RUNTIME_SA.
 APP_ENV="GCP_PROJECT_ID=${PROJECT_ID},GCP_BUCKET_NAME=${BUCKET}"
-APP_ENV+=",DOB_APP_TOKEN_ID=${DOB_APP_TOKEN_ID:-}"
 
 # ==== First Time Project Setup ====
 init() {
