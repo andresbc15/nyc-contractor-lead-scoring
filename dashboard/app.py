@@ -39,8 +39,9 @@ def prepare_contractors(contractors: pd.DataFrame) -> pd.DataFrame:
     return contractors
 
 
-def filter_leads(contractors: pd.DataFrame, current_only: bool, sizes: list,
-                 trades: list, search: str) -> pd.DataFrame:
+def filter_leads(contractors: pd.DataFrame, current_only: bool,
+                 sizes: list, trades: list, search: str,
+                 website: str) -> pd.DataFrame:
     """Applying the sidebar filters and sorting by lead score."""
     leads = contractors[contractors["size_tier"].isin(sizes)]
     if current_only:
@@ -50,8 +51,13 @@ def filter_leads(contractors: pd.DataFrame, current_only: bool, sizes: list,
     if search:
         names = leads["business_name"].fillna("")
         leads = leads[names.str.contains(search, case=False, regex=False)]
+    # AI-generated (Claude, claude-opus-5-5). Prompt: "Add a sidebar filter
+    # for has website / payment signal instead of a column."
+    if website == "Has a website":
+        leads = leads[leads["has_website"].fillna(False)]
+    elif website == "Payment signal found":
+        leads = leads[leads["payment_signal"].fillna(False)]
     return leads.sort_values("lead_score", ascending=False)
-
 
 def show_sidebar(contractors: pd.DataFrame) -> tuple:
     """Sidebar filters."""
@@ -70,8 +76,16 @@ def show_sidebar(contractors: pd.DataFrame) -> tuple:
         work_types = sorted(contractors["main_work_type"].dropna().unique())
         trades = st.multiselect("Main work type", work_types)
         search = st.text_input("Search business name")
-    return current_only, sizes, trades, search
 
+        # AI-generated (Claude, claude-opus-5-5). Prompt: "Add a sidebar
+        # filter for has website / payment signal instead of a column."
+        website_options = ["All contractors"]
+        if "has_website" in contractors.columns:
+            website_options.append("Has a website")
+        if "payment_signal" in contractors.columns:
+            website_options.append("Payment signal found")
+        website = st.radio("Website signal", website_options)
+    return current_only, sizes, trades, search, website
 
 def main():
     st.set_page_config(page_title="NYC Contractor Leads", layout="wide")
