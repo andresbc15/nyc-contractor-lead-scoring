@@ -3,6 +3,7 @@
 # joining all three sources, aggregates by trade and company size
 
 import pandas as pd
+import json
 
 from pipeline import storage
 
@@ -92,8 +93,26 @@ def summarize(data, by):
         .reset_index()
     )
 
+# adding nonempty(value) and website_domains(signals)
+def nonempty(value):
+    """True for values that are non empty list"""
+    return isinstance(value, list) and len(value) > 0
 
-def aggregate(joined):
+def website_domains(signals):
+    """From the signals, getting 2 things:
+    1. sites that loaded and were analyzed
+    2. sites with a payment signal"""
+    # keeping a domain's most recent result
+    latest = signals.drop_duplicates("domain", keep="last")
+    analyzed = latest[latest["has_online_payment"].notna()]
+    payment = (analyzed["has_online_payment"].astype(bool)
+               | analyzed["payment_tools"].apply(nonempty)
+               | analyzed["accounting_tools"].apply(nonempty)
+               | analyzed["pay_links"].apply(nonempty))
+    domains = analyzed["domain"].str.lower().str.strip()
+    return set(domains), set(domains[payment])
+
+def aggregate(joined, signals=None):
     """Build summaries by trade and company size for the dashboard."""
     data = joined.copy()
     # one ID per contractor: license type + number (note: numbers repeat across types)
@@ -157,6 +176,13 @@ def aggregate(joined):
         contractors["last_permit"] >= cutoff
     )
 
+    if signals is not None:
+        site_domains, payment_domains = website_domains(signals)
+        domain = (contractors["business_email"].str.lower().str.strip()
+                  .str.split("@").str[-1])
+        contractors["has_website"] = domain.isin(site_domains)
+        contractors["payment_signal"] = domain.isin(payment_domains)
+
     contractors = contractors.sort_values("lead_score", ascending=False)
 
     # giving every permit its contractor's size tier for the trade x size table
@@ -197,7 +223,13 @@ def run():
 
     clean = clean_permits(permits)
     joined = joint_resources(clean, licenses)
-    tables = aggregate(joined)
+
+    frames = []
+    for blob in storage.get_bucket().list_blobs(prefix="intermediate/website_signals"):
+        if blob.name.endswith(".json"):
+            frames.append(pd.DataFrame(json.loads(blob.download_as_text())))
+    signals = pd.concat(frames, ignore_index=True) if frames else None
+    tables = aggregate(joined, signals)
 
     return {name: storage.write_parquet(data, name) for name, data in tables.items()}
 
